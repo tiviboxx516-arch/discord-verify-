@@ -335,8 +335,8 @@ async def on_ready():
         title="🔐 Xác Minh",
 
         description=(
-            "Hãy click vào nút VERIFY bên dưới để chúng tôi xác minh bạn có phải là robot hay không" "\n"
-            "Có thắc mắc xin liên hệ @8zpc" "\n"
+            "Hãy click vào nút VERIFY bên dưới để chúng tôi xác minh bạn có phải là robot hay không." "\n"
+            "Có thắc mắc xin liên hệ @8zpc ." "\n"
             "Trân trọng !"
         ),
 
