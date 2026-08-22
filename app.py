@@ -335,8 +335,8 @@ async def on_ready():
         title="🔐 Xác Minh",
 
         description=(
-            "Hãy click vào nút VERIFY bên dưới để chúng tôi xác minh bạn có phải là robot hay không"
-            "Có thắc mắc xin liên hệ @8zpc"
+            "Hãy click vào nút VERIFY bên dưới để chúng tôi xác minh bạn có phải là robot hay không" "\n"
+            "Có thắc mắc xin liên hệ @8zpc" "\n"
             "Trân trọng !"
         ),
 
@@ -346,7 +346,7 @@ async def on_ready():
     url="https://cdn.discordapp.com/attachments/1539512033353928759/1539540467572809759/Wallpaper_Alchemy_-_Hinh_Nen_4K_Co_Gai_Anime_Haimiya_Mio.jpg?ex=6a89fc0a&is=6a88aa8a&hm=b07f1f1eea99af2c24d851b6f3d4eba79d42ad3844c626fc7813ff4ac52e39ca&"
     )
     embed.set_footer(
-        text="Server Verification"
+        text="Make by 8zpc with love"
     )
 
 
