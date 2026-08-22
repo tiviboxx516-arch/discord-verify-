@@ -4,74 +4,466 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Verified</title>
+    <title>Verification Successful</title>
 
     <style>
         * {
             box-sizing: border-box;
         }
 
-        body {
+        html, body {
             margin: 0;
+            width: 100%;
+            min-height: 100%;
+        }
+
+        body {
             min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            overflow: hidden;
+
+            color: #fff;
+            font-family:
+                Inter,
+                -apple-system,
+                BlinkMacSystemFont,
+                "Segoe UI",
+                Arial,
+                sans-serif;
+
+            background:
+                radial-gradient(
+                    circle at 20% 20%,
+                    rgba(88, 101, 242, 0.18),
+                    transparent 32%
+                ),
+                radial-gradient(
+                    circle at 80% 80%,
+                    rgba(114, 137, 218, 0.12),
+                    transparent 30%
+                ),
+                #07090d;
+        }
+
+        /* Background glow */
+
+        body::before {
+            content: "";
+            position: fixed;
+
+            width: 650px;
+            height: 650px;
+
+            top: -300px;
+            left: -250px;
+
+            border-radius: 50%;
+
+            background: rgba(88, 101, 242, 0.15);
+
+            filter: blur(120px);
+
+            animation: floatGlow 8s ease-in-out infinite alternate;
+
+            pointer-events: none;
+        }
+
+        body::after {
+            content: "";
+            position: fixed;
+
+            width: 550px;
+            height: 550px;
+
+            right: -250px;
+            bottom: -250px;
+
+            border-radius: 50%;
+
+            background: rgba(80, 110, 255, 0.12);
+
+            filter: blur(120px);
+
+            animation: floatGlow2 10s ease-in-out infinite alternate;
+
+            pointer-events: none;
+        }
+
+        @keyframes floatGlow {
+            from {
+                transform: translate(0, 0);
+            }
+
+            to {
+                transform: translate(80px, 70px);
+            }
+        }
+
+        @keyframes floatGlow2 {
+            from {
+                transform: translate(0, 0);
+            }
+
+            to {
+                transform: translate(-80px, -60px);
+            }
+        }
+
+        /* Small particles */
+
+        .particles {
+            position: fixed;
+            inset: 0;
+
+            overflow: hidden;
+
+            pointer-events: none;
+        }
+
+        .particle {
+            position: absolute;
+
+            width: 3px;
+            height: 3px;
+
+            border-radius: 50%;
+
+            background: rgba(255, 255, 255, 0.45);
+
+            animation: particleFloat linear infinite;
+        }
+
+        .particle:nth-child(1) {
+            left: 10%;
+            top: 80%;
+            animation-duration: 9s;
+        }
+
+        .particle:nth-child(2) {
+            left: 25%;
+            top: 20%;
+            animation-duration: 12s;
+        }
+
+        .particle:nth-child(3) {
+            left: 70%;
+            top: 70%;
+            animation-duration: 10s;
+        }
+
+        .particle:nth-child(4) {
+            left: 85%;
+            top: 25%;
+            animation-duration: 14s;
+        }
+
+        .particle:nth-child(5) {
+            left: 50%;
+            top: 90%;
+            animation-duration: 11s;
+        }
+
+        .particle:nth-child(6) {
+            left: 92%;
+            top: 55%;
+            animation-duration: 13s;
+        }
+
+        @keyframes particleFloat {
+            0% {
+                transform: translateY(0) scale(1);
+                opacity: 0;
+            }
+
+            20% {
+                opacity: 1;
+            }
+
+            80% {
+                opacity: 0.8;
+            }
+
+            100% {
+                transform: translateY(-180px) scale(0.3);
+                opacity: 0;
+            }
+        }
+
+        /* Main */
+
+        .container {
+            width: 100%;
+            padding: 25px;
+
+            display: flex;
+            justify-content: center;
+            align-items: center;
+
+            position: relative;
+            z-index: 2;
+        }
+
+        .card {
+            width: 440px;
+            max-width: 100%;
+
+            padding: 48px 42px;
+
+            text-align: center;
+
+            border: 1px solid rgba(255, 255, 255, 0.09);
+
+            border-radius: 28px;
+
+            background:
+                linear-gradient(
+                    145deg,
+                    rgba(28, 32, 43, 0.86),
+                    rgba(14, 17, 24, 0.92)
+                );
+
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+
+            box-shadow:
+                0 30px 90px rgba(0, 0, 0, 0.65),
+                0 0 80px rgba(88, 101, 242, 0.08);
+
+            animation: cardAppear 0.7s cubic-bezier(.2,.8,.2,1);
+        }
+
+        @keyframes cardAppear {
+            from {
+                opacity: 0;
+                transform: translateY(25px) scale(0.96);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        /* Check icon */
+
+        .check-wrapper {
+            width: 100px;
+            height: 100px;
+
+            margin: 0 auto 25px;
 
             display: flex;
             align-items: center;
             justify-content: center;
 
-            background: #0b0d12;
-            color: white;
+            border-radius: 50%;
 
-            font-family: Arial, sans-serif;
-        }
+            background:
+                radial-gradient(
+                    circle,
+                    rgba(67, 181, 129, 0.22),
+                    rgba(67, 181, 129, 0.04)
+                );
 
-        .card {
-            width: 420px;
-            max-width: 90%;
+            border: 1px solid rgba(67, 181, 129, 0.25);
 
-            padding: 45px;
+            box-shadow:
+                0 0 40px rgba(67, 181, 129, 0.12);
 
-            text-align: center;
-
-            background: #151820;
-
-            border-radius: 22px;
-
-            box-shadow: 0 20px 60px rgba(0,0,0,.5);
+            animation: checkPop 0.7s cubic-bezier(.17,.89,.32,1.28);
         }
 
         .check {
-            font-size: 70px;
-            margin-bottom: 15px;
+            font-size: 48px;
+
+            filter:
+                drop-shadow(
+                    0 0 15px rgba(67, 181, 129, 0.45)
+                );
+        }
+
+        @keyframes checkPop {
+            0% {
+                opacity: 0;
+                transform: scale(0.3);
+            }
+
+            70% {
+                transform: scale(1.12);
+            }
+
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
         }
 
         h1 {
-            margin-bottom: 10px;
+            margin: 0 0 12px;
+
+            font-size: 29px;
+            font-weight: 700;
+            letter-spacing: -0.6px;
+
+            background:
+                linear-gradient(
+                    90deg,
+                    #ffffff,
+                    #dfe3ff
+                );
+
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
 
-        p {
-            color: #aeb4c0;
+        .welcome {
+            margin: 0 0 10px;
+
+            color: #b7bdc9;
+
+            font-size: 16px;
+        }
+
+        .username {
+            color: #8ea1ff;
+            font-weight: 600;
+        }
+
+        .description {
+            margin: 0;
+
+            color: #858c99;
+
+            font-size: 14px;
+            line-height: 1.7;
+        }
+
+        /* Status */
+
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+
+            margin-top: 28px;
+            padding: 9px 14px;
+
+            border-radius: 999px;
+
+            background: rgba(67, 181, 129, 0.08);
+
+            border: 1px solid rgba(67, 181, 129, 0.16);
+
+            color: #71d7a5;
+
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .status-dot {
+            width: 7px;
+            height: 7px;
+
+            border-radius: 50%;
+
+            background: #43b581;
+
+            box-shadow:
+                0 0 10px rgba(67, 181, 129, 0.8);
+
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.5;
+                transform: scale(0.75);
+            }
+        }
+
+        /* Footer */
+
+        .footer {
+            margin-top: 30px;
+
+            color: #555c68;
+
+            font-size: 11px;
+            letter-spacing: 0.3px;
+        }
+
+        @media (max-width: 480px) {
+            .card {
+                padding: 40px 25px;
+                border-radius: 23px;
+            }
+
+            h1 {
+                font-size: 25px;
+            }
+
+            .check-wrapper {
+                width: 85px;
+                height: 85px;
+            }
+
+            .check {
+                font-size: 40px;
+            }
         }
     </style>
 </head>
 
 <body>
 
-<div class="card">
+    <div class="particles">
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+    </div>
 
-    <div class="check">✅</div>
+    <main class="container">
 
-    <h1>Verification successful!</h1>
+        <div class="card">
 
-    <p>
-        Welcome, {{ username }}!
-    </p>
+            <div class="check-wrapper">
+                <div class="check">✓</div>
+            </div>
 
-    <p>
-        Your Discord account has been verified successfully.
-    </p>
+            <h1>Xác Minh Thành Công</h1>
 
-</div>
+            <p class="welcome">
+                Chào mừng,
+                <span class="username">{{ username }}</span>
+            </p>
+
+            <p class="description">
+                Cảm ơn bạn đã xác minh, giờ bạn đã có thể tiếp tục ở server chúng tôi
+            </p>
+
+            <div class="status">
+                <span class="status-dot"></span>
+                Account Verified
+            </div>
+
+            <div class="footer">
+                Make by @8zpc in Tven
+            </div>
+
+        </div>
+
+    </main>
 
 </body>
 </html>
