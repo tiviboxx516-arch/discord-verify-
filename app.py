@@ -1,3 +1,4 @@
+
 import os
 import threading
 from urllib.parse import urlencode
@@ -11,7 +12,7 @@ from dotenv import load_dotenv
 
 
 # =========================================================
-# LOAD ENV
+# LOAD .ENV
 # =========================================================
 
 load_dotenv()
@@ -29,7 +30,7 @@ REDIRECT_URI = os.getenv("REDIRECT_URI")
 VERIFY_URL = os.getenv("VERIFY_URL")
 
 # Optional:
-# Nếu có thì bot sẽ không gửi lại message mỗi lần restart.
+# ID message verify đã tồn tại
 VERIFY_MESSAGE_ID = os.getenv("VERIFY_MESSAGE_ID")
 
 
@@ -40,7 +41,7 @@ DISCORD_API = "https://discord.com/api/v10"
 # CHECK ENV
 # =========================================================
 
-required_vars = {
+ENV_VARS = {
     "DISCORD_TOKEN": DISCORD_TOKEN,
     "CLIENT_ID": CLIENT_ID,
     "CLIENT_SECRET": CLIENT_SECRET,
@@ -53,13 +54,14 @@ required_vars = {
 
 missing = [
     name
-    for name, value in required_vars.items()
+    for name, value in ENV_VARS.items()
     if not value
 ]
 
 
 if missing:
 
+    print("")
     print("=" * 60)
     print("❌ MISSING ENVIRONMENT VARIABLES")
     print("=" * 60)
@@ -68,19 +70,19 @@ if missing:
         print(f" - {name}")
 
     print("=" * 60)
+    print("")
 
 
 # =========================================================
-# VERIFY URL
+# AUTO VERIFY URL
 # =========================================================
 
 if not VERIFY_URL and REDIRECT_URI:
 
-    VERIFY_URL = REDIRECT_URI.rsplit("/", 1)[0] + "/verify"
-
-    print(
-        f"VERIFY_URL was not found. "
-        f"Using: {VERIFY_URL}"
+    VERIFY_URL = (
+        REDIRECT_URI
+        .rsplit("/", 1)[0]
+        + "/verify"
     )
 
 
@@ -94,75 +96,114 @@ app = Flask(__name__)
 @app.route("/")
 def home():
 
-    return render_template("index.html")
+    return render_template(
+        "index.html"
+    )
 
 
 # =========================================================
-# VERIFY
+# DISCORD OAUTH VERIFY
 # =========================================================
 
 @app.route("/verify")
 def verify():
 
     if not CLIENT_ID:
-        return "CLIENT_ID is missing.", 500
+
+        return (
+            "CLIENT_ID is missing.",
+            500
+        )
+
 
     if not REDIRECT_URI:
-        return "REDIRECT_URI is missing.", 500
+
+        return (
+            "REDIRECT_URI is missing.",
+            500
+        )
+
 
     params = {
+
         "client_id": CLIENT_ID,
+
         "response_type": "code",
+
         "redirect_uri": REDIRECT_URI,
+
         "scope": "identify guilds.join",
     }
+
 
     oauth_url = (
         "https://discord.com/oauth2/authorize?"
         + urlencode(params)
     )
 
-    return redirect(oauth_url)
+
+    return redirect(
+        oauth_url
+    )
 
 
 # =========================================================
-# CALLBACK
+# OAUTH CALLBACK
 # =========================================================
 
 @app.route("/callback")
 def callback():
 
-    code = request.args.get("code")
+    code = request.args.get(
+        "code"
+    )
+
 
     if not code:
-        return "Verification cancelled.", 400
+
+        return (
+            "Verification cancelled.",
+            400
+        )
 
 
     # =====================================================
-    # EXCHANGE CODE -> ACCESS TOKEN
+    # EXCHANGE CODE
     # =====================================================
 
     try:
 
-        token_response = requests.post(
+        response = requests.post(
 
             f"{DISCORD_API}/oauth2/token",
 
             data={
-                "client_id": CLIENT_ID,
-                "client_secret": CLIENT_SECRET,
-                "grant_type": "authorization_code",
-                "code": code,
-                "redirect_uri": REDIRECT_URI,
+
+                "client_id":
+                    CLIENT_ID,
+
+                "client_secret":
+                    CLIENT_SECRET,
+
+                "grant_type":
+                    "authorization_code",
+
+                "code":
+                    code,
+
+                "redirect_uri":
+                    REDIRECT_URI,
             },
 
             headers={
+
                 "Content-Type":
                     "application/x-www-form-urlencoded"
             },
 
             timeout=15,
         )
+
 
     except requests.RequestException as e:
 
@@ -176,12 +217,12 @@ def callback():
         )
 
 
-    if token_response.status_code != 200:
+    if response.status_code != 200:
 
         print(
             "❌ OAuth token error:",
-            token_response.status_code,
-            token_response.text
+            response.status_code,
+            response.text
         )
 
         return (
@@ -192,15 +233,20 @@ def callback():
 
     try:
 
-        token_data = token_response.json()
+        token_data = response.json()
 
-        access_token = token_data["access_token"]
+        access_token = token_data[
+            "access_token"
+        ]
 
-    except (ValueError, KeyError):
+
+    except (
+        ValueError,
+        KeyError
+    ):
 
         print(
-            "❌ Invalid OAuth2 response:",
-            token_response.text
+            "❌ Invalid OAuth response."
         )
 
         return (
@@ -210,7 +256,7 @@ def callback():
 
 
     # =====================================================
-    # GET DISCORD USER
+    # GET USER
     # =====================================================
 
     try:
@@ -220,12 +266,14 @@ def callback():
             f"{DISCORD_API}/users/@me",
 
             headers={
+
                 "Authorization":
                     f"Bearer {access_token}"
             },
 
             timeout=15,
         )
+
 
     except requests.RequestException as e:
 
@@ -259,7 +307,11 @@ def callback():
 
         user_id = user["id"]
 
-    except (ValueError, KeyError):
+
+    except (
+        ValueError,
+        KeyError
+    ):
 
         return (
             "Invalid Discord user response.",
@@ -267,15 +319,21 @@ def callback():
         )
 
 
+    username = (
+        user.get("global_name")
+        or user.get("username")
+        or "User"
+    )
+
+
     print(
-        f"🔎 Verification requested by "
-        f"{user.get('username', 'Unknown')} "
-        f"({user_id})"
+        f"🔎 Verification: "
+        f"{username} ({user_id})"
     )
 
 
     # =====================================================
-    # ADD USER TO SERVER
+    # JOIN SERVER
     # =====================================================
 
     try:
@@ -287,6 +345,7 @@ def callback():
             f"{user_id}",
 
             headers={
+
                 "Authorization":
                     f"Bot {DISCORD_TOKEN}",
 
@@ -295,16 +354,19 @@ def callback():
             },
 
             json={
-                "access_token": access_token
+
+                "access_token":
+                    access_token
             },
 
             timeout=15,
         )
 
+
     except requests.RequestException as e:
 
         print(
-            f"❌ Guild join error: {e}"
+            f"❌ Guild join request error: {e}"
         )
 
         return (
@@ -332,12 +394,12 @@ def callback():
 
 
     print(
-        f"✅ User {user_id} joined guild."
+        f"✅ User {user_id} joined server."
     )
 
 
     # =====================================================
-    # GIVE VERIFIED ROLE
+    # GIVE ROLE
     # =====================================================
 
     try:
@@ -350,12 +412,14 @@ def callback():
             f"{VERIFIED_ROLE_ID}",
 
             headers={
+
                 "Authorization":
                     f"Bot {DISCORD_TOKEN}"
             },
 
             timeout=15,
         )
+
 
     except requests.RequestException as e:
 
@@ -387,23 +451,14 @@ def callback():
 
 
     print(
-        f"✅ Verified role assigned to {user_id}"
+        f"✅ Verified role assigned "
+        f"to {user_id}"
     )
 
 
     # =====================================================
     # SUCCESS
     # =====================================================
-
-    username = (
-
-        user.get("global_name")
-
-        or user.get("username")
-
-        or "User"
-    )
-
 
     return render_template(
         "success.html",
@@ -419,7 +474,9 @@ intents = discord.Intents.default()
 
 
 bot = commands.Bot(
+
     command_prefix="!",
+
     intents=intents
 )
 
@@ -428,7 +485,9 @@ bot = commands.Bot(
 # VERIFY BUTTON
 # =========================================================
 
-class VerifyView(discord.ui.View):
+class VerifyView(
+    discord.ui.View
+):
 
     def __init__(self):
 
@@ -436,15 +495,17 @@ class VerifyView(discord.ui.View):
             timeout=None
         )
 
+
         self.add_item(
 
             discord.ui.Button(
 
-                label="VERIFY (Ấn vào đây để xác minh)",
+                label="VERIFY",
 
                 emoji="✅",
 
-                style=discord.ButtonStyle.link,
+                style=
+                    discord.ButtonStyle.link,
 
                 url=VERIFY_URL
             )
@@ -452,25 +513,64 @@ class VerifyView(discord.ui.View):
 
 
 # =========================================================
-# BOT READY
+# EMBED
 # =========================================================
 
-@bot.event
-async def on_ready():
+def create_verify_embed():
 
-    print("=" * 60)
+    embed = discord.Embed(
 
-    print(
-        f"✅ Discord bot logged in as "
-        f"{bot.user} ({bot.user.id})"
+        title="🔐 Xác Minh",
+
+        description=(
+
+            "Hãy click vào nút **VERIFY** "
+            "bên dưới để xác minh bạn có phải "
+            "là robot hay không.\n\n"
+
+            "Có thắc mắc xin liên hệ @8zpc.\n"
+
+            "Trân trọng!"
+        ),
+
+        color=discord.Color.blurple()
     )
 
-    print("=" * 60)
+
+    embed.set_image(
+
+        url=(
+            "https://cdn.discordapp.com/attachments/"
+            "1539512033353928759/"
+            "1539540467572809759/"
+            "Wallpaper_Alchemy_-_Hinh_Nen_4K_Co_Gai_Anime_Haimiya_Mio.jpg"
+        )
+    )
 
 
-    # =====================================================
-    # CHECK CHANNEL ID
-    # =====================================================
+    embed.set_footer(
+
+        text="Make by 8zpc with love"
+    )
+
+
+    return embed
+
+
+# =========================================================
+# FIND CHANNEL
+# =========================================================
+
+async def get_verify_channel():
+
+    if not VERIFY_CHANNEL_ID:
+
+        print(
+            "❌ VERIFY_CHANNEL_ID is empty."
+        )
+
+        return None
+
 
     try:
 
@@ -484,16 +584,30 @@ async def on_ready():
     ):
 
         print(
-            f"❌ VERIFY_CHANNEL_ID is invalid: "
+            f"❌ Invalid VERIFY_CHANNEL_ID: "
             f"{VERIFY_CHANNEL_ID}"
         )
 
-        return
+        return None
 
 
-    # =====================================================
-    # FETCH CHANNEL
-    # =====================================================
+    # -----------------------------------------------------
+    # CACHE
+    # -----------------------------------------------------
+
+    channel = bot.get_channel(
+        channel_id
+    )
+
+
+    if channel:
+
+        return channel
+
+
+    # -----------------------------------------------------
+    # API
+    # -----------------------------------------------------
 
     try:
 
@@ -501,169 +615,278 @@ async def on_ready():
             channel_id
         )
 
+        return channel
+
+
     except discord.NotFound:
 
         print(
-            f"❌ Channel does not exist: "
-            f"{channel_id}"
+            f"❌ Channel {channel_id} "
+            f"does not exist."
         )
 
-        return
 
     except discord.Forbidden:
 
         print(
-            f"❌ Bot does not have permission "
-            f"to access channel {channel_id}"
+            f"❌ Bot cannot access "
+            f"channel {channel_id}."
         )
 
-        return
 
     except discord.HTTPException as e:
 
         print(
-            f"❌ Discord channel fetch error: "
-            f"{e}"
+            f"❌ Discord API error "
+            f"while fetching channel: {e}"
         )
 
-        return
+
+    return None
+
+
+# =========================================================
+# CHECK PERMISSIONS
+# =========================================================
+
+def check_channel_permissions(
+    channel
+):
+
+    try:
+
+        guild = channel.guild
+
+        member = guild.me
+
+
+        if member is None:
+
+            print(
+                "❌ Could not get bot member."
+            )
+
+            return False
+
+
+        permissions = (
+            channel.permissions_for(
+                member
+            )
+        )
+
+
+        print("")
+        print("----------------------------------------")
+        print("BOT CHANNEL PERMISSIONS")
+        print("----------------------------------------")
+
+        print(
+            f"View Channel   : "
+            f"{permissions.view_channel}"
+        )
+
+        print(
+            f"Send Messages  : "
+            f"{permissions.send_messages}"
+        )
+
+        print(
+            f"Embed Links    : "
+            f"{permissions.embed_links}"
+        )
+
+        print("----------------------------------------")
+
+
+        if not permissions.view_channel:
+
+            print(
+                "❌ Missing View Channel."
+            )
+
+            return False
+
+
+        if not permissions.send_messages:
+
+            print(
+                "❌ Missing Send Messages."
+            )
+
+            return False
+
+
+        if not permissions.embed_links:
+
+            print(
+                "❌ Missing Embed Links."
+            )
+
+            return False
+
+
+        return True
+
 
     except Exception as e:
 
         print(
-            f"❌ Unexpected channel error: "
-            f"{e}"
+            f"❌ Permission check error: {e}"
+        )
+
+        return False
+
+
+# =========================================================
+# SEND VERIFY MESSAGE
+# =========================================================
+
+async def send_verify_message():
+
+    print("")
+    print("=" * 60)
+    print("🔐 VERIFY MESSAGE SYSTEM")
+    print("=" * 60)
+
+
+    channel = await get_verify_channel()
+
+
+    if channel is None:
+
+        print(
+            "❌ Verify channel unavailable."
         )
 
         return
 
 
     print(
-        f"✅ Found verify channel: "
-        f"#{channel.name}"
+        f"✅ Channel: #{channel.name}"
     )
+
+    print(
+        f"✅ Channel ID: {channel.id}"
+    )
+
+    print(
+        f"✅ Guild: {channel.guild.name}"
+    )
+
+    print(
+        f"✅ Guild ID: {channel.guild.id}"
+    )
+
+
+    # =====================================================
+    # CHECK GUILD
+    # =====================================================
+
+    if str(channel.guild.id) != str(GUILD_ID):
+
+        print("")
+        print(
+            "❌ CHANNEL KHÔNG THUỘC GUILD_ID."
+        )
+
+        print(
+            f"GUILD_ID env: "
+            f"{GUILD_ID}"
+        )
+
+        print(
+            f"Channel guild: "
+            f"{channel.guild.id}"
+        )
+
+        return
 
 
     # =====================================================
     # CHECK PERMISSIONS
     # =====================================================
 
-    try:
+    if not check_channel_permissions(
+        channel
+    ):
 
-        guild = channel.guild
-
-        me = guild.me
-
-        permissions = channel.permissions_for(me)
-
-        print(
-            "Bot permissions:"
-        )
-
-        print(
-            f"  View Channel: "
-            f"{permissions.view_channel}"
-        )
-
-        print(
-            f"  Send Messages: "
-            f"{permissions.send_messages}"
-        )
-
-        print(
-            f"  Embed Links: "
-            f"{permissions.embed_links}"
-        )
+        return
 
 
-        if not permissions.view_channel:
+    # =====================================================
+    # EXISTING MESSAGE
+    # =====================================================
+
+    if VERIFY_MESSAGE_ID:
+
+        try:
+
+            old_message = await channel.fetch_message(
+                int(VERIFY_MESSAGE_ID)
+            )
+
+
+            print("")
+            print(
+                "✅ Existing verification "
+                "message found."
+            )
 
             print(
-                "❌ Bot cannot VIEW this channel."
+                f"Message ID: "
+                f"{old_message.id}"
             )
+
+            print(
+                "⏭️ Không gửi message mới."
+            )
+
+            print("=" * 60)
 
             return
 
 
-        if not permissions.send_messages:
+        except discord.NotFound:
 
             print(
-                "❌ Bot cannot SEND messages "
-                "in this channel."
+                "⚠️ VERIFY_MESSAGE_ID không "
+                "còn tồn tại."
             )
 
-            return
 
-
-        if not permissions.embed_links:
+        except (
+            ValueError,
+            TypeError
+        ):
 
             print(
-                "❌ Bot cannot EMBED links "
-                "in this channel."
+                "⚠️ VERIFY_MESSAGE_ID không hợp lệ."
             )
 
-            return
 
+        except discord.HTTPException as e:
 
-    except Exception as e:
-
-        print(
-            f"⚠️ Permission check failed: {e}"
-        )
+            print(
+                f"⚠️ Could not check old "
+                f"message: {e}"
+            )
 
 
     # =====================================================
-    # EMBED
+    # CREATE MESSAGE
     # =====================================================
 
-    embed = discord.Embed(
+    embed = create_verify_embed()
 
-        title="🔐 Xác Minh",
+    view = VerifyView()
 
-        description=(
 
-            "Hãy click vào nút **VERIFY** bên dưới "
-            "để chúng tôi xác minh bạn có phải là robot hay không.\n\n"
-
-            "Có thắc mắc xin liên hệ @8zpc.\n"
-
-            "Trân trọng!"
-        ),
-
-        color=discord.Color.blurple()
+    print("")
+    print(
+        "📨 Sending verification message..."
     )
 
-
-    # =====================================================
-    # EMBED IMAGE
-    # =====================================================
-
-    embed.set_image(
-
-        url=(
-            "https://cdn.discordapp.com/attachments/"
-            "1539512033353928759/"
-            "1539540467572809759/"
-            "Wallpaper_Alchemy_-_Hinh_Nen_4K_Co_Gai_Anime_Haimiya_Mio.jpg"
-            "?ex=6a89fc0a"
-            "&is=6a88aa8a"
-            "&hm=b07f1f1eea99af2c24d851b6f3d4eba79d42ad3844c626fc7813ff4ac52e39ca&"
-        )
-    )
-
-
-    # =====================================================
-    # FOOTER
-    # =====================================================
-
-    embed.set_footer(
-        text="Make by 8zpc with love"
-    )
-
-
-    # =====================================================
-    # SEND VERIFY MESSAGE
-    # =====================================================
 
     try:
 
@@ -671,59 +894,208 @@ async def on_ready():
 
             embed=embed,
 
-            view=VerifyView()
-        )
-
-
-        print("=" * 60)
-
-        print(
-            "✅ VERIFICATION MESSAGE SENT"
-        )
-
-        print(
-            f"Message ID: {message.id}"
-        )
-
-        print("=" * 60)
-
-        print(
-            "💡 Add this to Render Environment Variables:"
-        )
-
-        print(
-            f"VERIFY_MESSAGE_ID={message.id}"
+            view=view
         )
 
 
     except discord.Forbidden:
 
+        print("")
         print(
-            "❌ DISCORD FORBIDDEN"
+            "❌ DISCORD FORBIDDEN."
         )
 
         print(
-            "Bot cannot send messages/embeds "
-            "in this channel."
+            "Bot không có quyền gửi message."
         )
+
+        return
 
 
     except discord.HTTPException as e:
 
+        print("")
         print(
             f"❌ DISCORD HTTP ERROR: {e}"
         )
 
+        return
+
 
     except Exception as e:
 
+        print("")
         print(
-            f"❌ SEND MESSAGE ERROR: {e}"
+            f"❌ UNKNOWN SEND ERROR: {e}"
         )
+
+        return
+
+
+    # =====================================================
+    # SUCCESS
+    # =====================================================
+
+    print("")
+    print("=" * 60)
+    print(
+        "✅ VERIFY MESSAGE SENT SUCCESSFULLY"
+    )
+    print("=" * 60)
+
+    print(
+        f"Message ID: {message.id}"
+    )
+
+    print(
+        f"Channel ID: {channel.id}"
+    )
+
+    print(
+        f"Channel URL:"
+    )
+
+    print(
+        f"https://discord.com/channels/"
+        f"{channel.guild.id}/"
+        f"{channel.id}/"
+        f"{message.id}"
+    )
+
+    print("")
+    print(
+        "Render Environment Variable:"
+    )
+
+    print(
+        f"VERIFY_MESSAGE_ID={message.id}"
+    )
+
+    print("=" * 60)
 
 
 # =========================================================
-# BOT START
+# BOT READY
+# =========================================================
+
+@bot.event
+async def on_ready():
+
+    print("")
+    print("=" * 60)
+    print("🤖 DISCORD BOT ONLINE")
+    print("=" * 60)
+
+    print(
+        f"Username : {bot.user}"
+    )
+
+    print(
+        f"Bot ID   : {bot.user.id}"
+    )
+
+    print(
+        f"Servers  : {len(bot.guilds)}"
+    )
+
+
+    # -----------------------------------------------------
+    # LIST SERVERS
+    # -----------------------------------------------------
+
+    for guild in bot.guilds:
+
+        print(
+            f"  • {guild.name} "
+            f"({guild.id})"
+        )
+
+
+    print("=" * 60)
+
+
+    # -----------------------------------------------------
+    # CHECK GUILD ID
+    # -----------------------------------------------------
+
+    if not GUILD_ID:
+
+        print(
+            "❌ GUILD_ID is missing."
+        )
+
+        return
+
+
+    try:
+
+        guild_id = int(
+            GUILD_ID
+        )
+
+    except ValueError:
+
+        print(
+            f"❌ Invalid GUILD_ID: "
+            f"{GUILD_ID}"
+        )
+
+        return
+
+
+    # -----------------------------------------------------
+    # GET GUILD
+    # -----------------------------------------------------
+
+    guild = bot.get_guild(
+        guild_id
+    )
+
+
+    if guild is None:
+
+        print("")
+        print(
+            "❌ BOT KHÔNG Ở TRONG SERVER."
+        )
+
+        print(
+            f"Required Guild ID: "
+            f"{guild_id}"
+        )
+
+        print("")
+        print(
+            "Bot hiện đang ở:"
+        )
+
+
+        for g in bot.guilds:
+
+            print(
+                f"  • {g.name} "
+                f"({g.id})"
+            )
+
+
+        return
+
+
+    print(
+        f"✅ Server found: "
+        f"{guild.name}"
+    )
+
+
+    # -----------------------------------------------------
+    # SEND VERIFY MESSAGE
+    # -----------------------------------------------------
+
+    await send_verify_message()
+
+
+# =========================================================
+# START BOT
 # =========================================================
 
 def start_discord_bot():
@@ -743,11 +1115,20 @@ def start_discord_bot():
             DISCORD_TOKEN
         )
 
+
     except discord.LoginFailure:
 
         print(
-            "❌ Discord token is invalid."
+            "❌ DISCORD TOKEN IS INVALID."
         )
+
+
+    except discord.PrivilegedIntentsRequired:
+
+        print(
+            "❌ Discord requires privileged intents."
+        )
+
 
     except Exception as e:
 
@@ -757,7 +1138,7 @@ def start_discord_bot():
 
 
 # =========================================================
-# START BOT THREAD
+# START DISCORD THREAD
 # =========================================================
 
 bot_thread = threading.Thread(
@@ -767,11 +1148,12 @@ bot_thread = threading.Thread(
     daemon=True
 )
 
+
 bot_thread.start()
 
 
 # =========================================================
-# FLASK START
+# START FLASK
 # =========================================================
 
 if __name__ == "__main__":
@@ -784,9 +1166,12 @@ if __name__ == "__main__":
     )
 
 
+    print("")
+    print("=" * 60)
     print(
         f"🌐 Flask starting on port {port}"
     )
+    print("=" * 60)
 
 
     app.run(
