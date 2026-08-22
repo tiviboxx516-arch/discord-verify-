@@ -276,7 +276,7 @@ class VerifyView(discord.ui.View):
 
         self.add_item(
             discord.ui.Button(
-                label="VERIFY",
+                label="VERIFY (Ấn vào đây để xác minh)",
                 emoji="✅",
                 style=discord.ButtonStyle.link,
                 url=VERIFY_URL
@@ -332,19 +332,19 @@ async def on_ready():
     # -----------------------------------------------------
 
     embed = discord.Embed(
-        title="🔐 Server Verification",
+        title="🔐 Xác Minh",
 
         description=(
-            "Click the button below to verify "
-            "your Discord account.\n\n"
-
-            "After verification, you will automatically "
-            "receive the **Verified** role."
+            "Hãy click vào nút VERIFY bên dưới để chúng tôi xác minh bạn có phải là robot hay không"
+            "Có thắc mắc xin liên hệ @8zpc"
+            "Trân trọng !"
         ),
 
         color=discord.Color.blurple()
     )
-
+    embed.set_image(
+    url="https://cdn.discordapp.com/attachments/1539512033353928759/1539540467572809759/Wallpaper_Alchemy_-_Hinh_Nen_4K_Co_Gai_Anime_Haimiya_Mio.jpg?ex=6a89fc0a&is=6a88aa8a&hm=b07f1f1eea99af2c24d851b6f3d4eba79d42ad3844c626fc7813ff4ac52e39ca&"
+    )
     embed.set_footer(
         text="Server Verification"
     )
