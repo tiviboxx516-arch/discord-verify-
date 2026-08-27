@@ -1,5 +1,5 @@
-
 import os
+import threading
 import requests
 import discord
 
@@ -14,17 +14,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 CLIENT_ID = os.getenv("CLIENT_ID")
 CLIENT_SECRET = os.getenv("CLIENT_SECRET")
-
 GUILD_ID = os.getenv("GUILD_ID")
 VERIFIED_ROLE_ID = os.getenv("VERIFIED_ROLE_ID")
-
+VERIFY_CHANNEL_ID = os.getenv("VERIFY_CHANNEL_ID")
 REDIRECT_URI = os.getenv("REDIRECT_URI")
 VERIFY_URL = os.getenv("VERIFY_URL")
-
 
 DISCORD_API = "https://discord.com/api/v10"
 
@@ -39,10 +36,10 @@ required_vars = {
     "CLIENT_SECRET": CLIENT_SECRET,
     "GUILD_ID": GUILD_ID,
     "VERIFIED_ROLE_ID": VERIFIED_ROLE_ID,
+    "VERIFY_CHANNEL_ID": VERIFY_CHANNEL_ID,
     "REDIRECT_URI": REDIRECT_URI,
     "VERIFY_URL": VERIFY_URL,
 }
-
 
 missing = [
     name
@@ -50,17 +47,10 @@ missing = [
     if not value
 ]
 
-
 if missing:
-
-    print("=" * 60)
-    print("MISSING ENVIRONMENT VARIABLES")
-    print("=" * 60)
-
+    print("Missing environment variables:")
     for name in missing:
         print(f" - {name}")
-
-    print("=" * 60)
 
 
 # =========================================================
@@ -70,16 +60,9 @@ if missing:
 app = Flask(__name__)
 
 
-# =========================================================
-# HOME
-# =========================================================
-
 @app.route("/")
 def home():
-
-    return render_template(
-        "index.html"
-    )
+    return render_template("index.html")
 
 
 # =========================================================
@@ -89,43 +72,18 @@ def home():
 @app.route("/verify")
 def verify():
 
-    if not CLIENT_ID:
+    if not CLIENT_ID or not REDIRECT_URI:
+        return "OAuth configuration is missing.", 500
 
-        return (
-            "CLIENT_ID is missing.",
-            500
-        )
-
-
-    if not REDIRECT_URI:
-
-        return (
-            "REDIRECT_URI is missing.",
-            500
-        )
-
-
-    # Discord OAuth URL
-
-    oauth_url = (
-
+    url = (
         "https://discord.com/oauth2/authorize"
-
         f"?client_id={CLIENT_ID}"
-
         "&response_type=code"
-
-        f"&redirect_uri="
-        f"{requests.utils.quote(REDIRECT_URI, safe='')}"
-
+        f"&redirect_uri={requests.utils.quote(REDIRECT_URI, safe='')}"
         "&scope=identify%20guilds.join"
-
     )
 
-
-    return redirect(
-        oauth_url
-    )
+    return redirect(url)
 
 
 # =========================================================
@@ -135,76 +93,31 @@ def verify():
 @app.route("/callback")
 def callback():
 
-    code = request.args.get(
-        "code"
-    )
-
+    code = request.args.get("code")
 
     if not code:
+        return "Verification cancelled.", 400
 
-        return (
-            "Verification cancelled.",
-            400
-        )
-
-
-    # =====================================================
-    # EXCHANGE CODE -> ACCESS TOKEN
-    # =====================================================
+    # -----------------------------------------------------
+    # Exchange OAuth code -> access token
+    # -----------------------------------------------------
 
     try:
-
         token_response = requests.post(
-
             f"{DISCORD_API}/oauth2/token",
-
             data={
-
-                "client_id":
-                    CLIENT_ID,
-
-                "client_secret":
-                    CLIENT_SECRET,
-
-                "grant_type":
-                    "authorization_code",
-
-                "code":
-                    code,
-
-                "redirect_uri":
-                    REDIRECT_URI,
-
+                "client_id": CLIENT_ID,
+                "client_secret": CLIENT_SECRET,
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": REDIRECT_URI,
             },
-
-            headers={
-
-                "Content-Type":
-                    "application/x-www-form-urlencoded"
-
-            },
-
             timeout=15,
-
         )
-
 
     except requests.RequestException as e:
-
-        print(
-            "Token request error:",
-            e
-        )
-
-        return (
-            "Could not connect to Discord.",
-            502
-        )
-
-
-    # =====================================================
-    # CHECK TOKEN RESPONSE
-    # =====================================================
+        print("Token request error:", e)
+        return "Could not connect to Discord.", 502
 
     if token_response.status_code != 200:
 
@@ -214,76 +127,31 @@ def callback():
             token_response.text
         )
 
-        return (
-            "OAuth2 authentication failed.",
-            400
-        )
-
+        return "OAuth2 authentication failed.", 400
 
     try:
+        access_token = token_response.json()["access_token"]
 
-        token_data = (
-            token_response.json()
-        )
-
-        access_token = (
-            token_data["access_token"]
-        )
+    except (KeyError, ValueError):
+        return "Invalid OAuth2 response.", 400
 
 
-    except (
-        KeyError,
-        ValueError
-    ):
-
-        print(
-            "Invalid OAuth2 response."
-        )
-
-        return (
-            "Invalid OAuth2 response.",
-            400
-        )
-
-
-    # =====================================================
-    # GET DISCORD USER
-    # =====================================================
+    # -----------------------------------------------------
+    # Get Discord user
+    # -----------------------------------------------------
 
     try:
-
         user_response = requests.get(
-
             f"{DISCORD_API}/users/@me",
-
             headers={
-
-                "Authorization":
-                    f"Bearer {access_token}"
-
+                "Authorization": f"Bearer {access_token}"
             },
-
             timeout=15,
-
         )
-
 
     except requests.RequestException as e:
-
-        print(
-            "User request error:",
-            e
-        )
-
-        return (
-            "Could not connect to Discord.",
-            502
-        )
-
-
-    # =====================================================
-    # CHECK USER RESPONSE
-    # =====================================================
+        print("User request error:", e)
+        return "Could not connect to Discord.", 502
 
     if user_response.status_code != 200:
 
@@ -293,86 +161,39 @@ def callback():
             user_response.text
         )
 
-        return (
-            "Could not get Discord account.",
-            400
-        )
+        return "Could not get Discord account.", 400
+
+    user = user_response.json()
+
+    user_id = user["id"]
 
 
-    try:
-
-        user = user_response.json()
-
-        user_id = user["id"]
-
-
-    except (
-        KeyError,
-        ValueError
-    ):
-
-        return (
-            "Invalid Discord user response.",
-            400
-        )
-
-
-    # =====================================================
-    # ADD USER TO SERVER
-    # =====================================================
+    # -----------------------------------------------------
+    # Add user to server
+    # -----------------------------------------------------
 
     try:
-
         join_response = requests.put(
-
             f"{DISCORD_API}/guilds/"
-            f"{GUILD_ID}/members/"
-            f"{user_id}",
+            f"{GUILD_ID}/members/{user_id}",
 
             headers={
-
-                "Authorization":
-                    f"Bot {DISCORD_TOKEN}",
-
-                "Content-Type":
-                    "application/json",
-
+                "Authorization": f"Bot {DISCORD_TOKEN}",
+                "Content-Type": "application/json",
             },
 
             json={
-
-                "access_token":
-                    access_token
-
+                "access_token": access_token
             },
 
             timeout=15,
-
         )
-
 
     except requests.RequestException as e:
+        print("Guild join error:", e)
+        return "Could not connect to Discord.", 502
 
-        print(
-            "Guild join error:",
-            e
-        )
-
-        return (
-            "Could not connect to Discord.",
-            502
-        )
-
-
-    # =====================================================
-    # CHECK JOIN
-    # =====================================================
-
-    if join_response.status_code not in (
-        200,
-        201,
-        204
-    ):
+    if join_response.status_code not in (200, 201, 204):
 
         print(
             "Guild join error:",
@@ -380,58 +201,32 @@ def callback():
             join_response.text
         )
 
-        return (
-            "Could not join Discord server.",
-            400
-        )
+        return "Could not join Discord server.", 400
 
 
-    # =====================================================
-    # GIVE VERIFIED ROLE
-    # =====================================================
+    # -----------------------------------------------------
+    # Give Verified role
+    # -----------------------------------------------------
 
     try:
-
         role_response = requests.put(
-
             f"{DISCORD_API}/guilds/"
             f"{GUILD_ID}/members/"
             f"{user_id}/roles/"
             f"{VERIFIED_ROLE_ID}",
 
             headers={
-
-                "Authorization":
-                    f"Bot {DISCORD_TOKEN}"
-
+                "Authorization": f"Bot {DISCORD_TOKEN}"
             },
 
             timeout=15,
-
         )
-
 
     except requests.RequestException as e:
+        print("Role request error:", e)
+        return "Could not connect to Discord.", 502
 
-        print(
-            "Role request error:",
-            e
-        )
-
-        return (
-            "Could not connect to Discord.",
-            502
-        )
-
-
-    # =====================================================
-    # CHECK ROLE
-    # =====================================================
-
-    if role_response.status_code not in (
-        200,
-        204
-    ):
+    if role_response.status_code not in (200, 204):
 
         print(
             "Role assignment error:",
@@ -439,33 +234,22 @@ def callback():
             role_response.text
         )
 
-        return (
-            "Verified, but role assignment failed.",
-            500
-        )
+        return "Verified, but role assignment failed.", 500
 
 
-    # =====================================================
-    # SUCCESS
-    # =====================================================
+    # -----------------------------------------------------
+    # Success
+    # -----------------------------------------------------
 
     username = (
-
         user.get("global_name")
-
         or user.get("username")
-
         or "User"
-
     )
 
-
     return render_template(
-
         "success.html",
-
         username=username
-
     )
 
 
@@ -475,14 +259,29 @@ def callback():
 
 intents = discord.Intents.default()
 
-
 bot = commands.Bot(
-
     command_prefix="!",
-
     intents=intents
-
 )
+
+
+# =========================================================
+# VERIFY BUTTON
+# =========================================================
+
+class VerifyView(discord.ui.View):
+
+    def __init__(self):
+        super().__init__(timeout=None)
+
+        self.add_item(
+            discord.ui.Button(
+                label="VERIFY (Ấn vào đây để xác minh)",
+                emoji="✅",
+                style=discord.ButtonStyle.link,
+                url=VERIFY_URL
+            )
+        )
 
 
 # =========================================================
@@ -497,13 +296,84 @@ async def on_ready():
         f"{bot.user} ({bot.user.id})"
     )
 
-    print(
-        "Verify message sending is DISABLED."
-    )
+    try:
+        channel_id = int(VERIFY_CHANNEL_ID)
+
+    except (TypeError, ValueError):
+
+        print(
+            "VERIFY_CHANNEL_ID is invalid:"
+            f" {VERIFY_CHANNEL_ID}"
+        )
+
+        return
+
+
+    channel = bot.get_channel(channel_id)
+
+    if channel is None:
+
+        print(
+            "Could not find verify channel: "
+            f"{channel_id}"
+        )
+
+        return
+
 
     print(
-        "Bot will NOT send messages to any channel."
+        f"Found verify channel: "
+        f"#{channel.name}"
     )
+
+
+    # -----------------------------------------------------
+    # Send verification message
+    # -----------------------------------------------------
+
+    embed = discord.Embed(
+        title="🔐 Xác Minh",
+
+        description=(
+            "Hãy click vào nút VERIFY bên dưới để chúng tôi xác minh bạn có phải là robot hay không." "\n"
+            "Có thắc mắc xin liên hệ @8zpc ." "\n"
+            "Trân trọng !"
+        ),
+
+        color=discord.Color.blurple()
+    )
+    embed.set_image(
+    url="https://cdn.discordapp.com/attachments/1539512033353928759/1539540467572809759/Wallpaper_Alchemy_-_Hinh_Nen_4K_Co_Gai_Anime_Haimiya_Mio.jpg?ex=6a89fc0a&is=6a88aa8a&hm=b07f1f1eea99af2c24d851b6f3d4eba79d42ad3844c626fc7813ff4ac52e39ca&"
+    )
+    embed.set_footer(
+        text="Make by 8zpc with love"
+    )
+
+
+    try:
+
+        await channel.send(
+            embed=embed,
+            view=VerifyView()
+        )
+
+        print(
+            "Verification message sent successfully."
+        )
+
+    except discord.Forbidden:
+
+        print(
+            "Bot does not have permission "
+            "to send messages in this channel."
+        )
+
+    except discord.HTTPException as e:
+
+        print(
+            "Discord API error while sending "
+            f"verification message: {e}"
+        )
 
 
 # =========================================================
@@ -515,25 +385,15 @@ def start_discord_bot():
     if not DISCORD_TOKEN:
 
         print(
-            "DISCORD_TOKEN is missing."
+            "DISCORD_TOKEN is missing. "
+            "Discord bot will not start."
         )
 
         return
 
-
     try:
 
-        bot.run(
-            DISCORD_TOKEN
-        )
-
-
-    except discord.LoginFailure:
-
-        print(
-            "Invalid Discord bot token."
-        )
-
+        bot.run(DISCORD_TOKEN)
 
     except Exception as e:
 
@@ -542,49 +402,25 @@ def start_discord_bot():
         )
 
 
-# =========================================================
-# START BOT
-# =========================================================
-
-bot_thread = __import__(
-    "threading"
-).Thread(
-
+bot_thread = threading.Thread(
     target=start_discord_bot,
-
     daemon=True
-
 )
-
 
 bot_thread.start()
 
 
 # =========================================================
-# START FLASK
+# FLASK START
 # =========================================================
 
 if __name__ == "__main__":
 
     port = int(
-
-        os.getenv(
-            "PORT",
-            "10000"
-        )
-
+        os.getenv("PORT", "10000")
     )
-
-
-    print(
-        f"Flask starting on port {port}"
-    )
-
 
     app.run(
-
         host="0.0.0.0",
-
         port=port
-
     )
